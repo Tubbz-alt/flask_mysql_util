@@ -1,6 +1,8 @@
-import pymysql
 import os
 from flask import _request_ctx_stack
+
+import pymysql
+import pymysql.cursors
 
 
 CONFIG_KEYS = {'_DATABASE_HOST': 'localhost', '_DATABASE_PORT': 3306, '_DATABASE_USER': None, '_DATABASE_PASSWORD': None, '_DATABASE_DB': None, '_DATABASE_CHARSET': 'utf8', '_DATABASE_USE_UNICODE': True}
@@ -25,6 +27,8 @@ class MultiMySQL(object):
     """
     def __init__(self, prefix, app=None, **connect_args):
         self.connect_args = connect_args
+        if 'cursorclass' not in connect_args:
+            self.connect_args['cursorclass']=pymysql.cursors.DictCursor
         self.prefix = prefix
         self.config = {}
         for config_key, default_val in CONFIG_KEYS.items():
@@ -65,7 +69,7 @@ class MultiMySQL(object):
             self.connect_args['charset'] = self.config[self.prefix + '_DATABASE_CHARSET']
         if self.config[self.prefix + '_DATABASE_USE_UNICODE']:
             self.connect_args['use_unicode'] = self.config[self.prefix + '_DATABASE_USE_UNICODE']
-        return MySQLdb.connect(**self.connect_args)
+        return pymysql.connect(**self.connect_args)
 
     def before_request(self):
         '''Flask before request callback'''
@@ -78,6 +82,6 @@ class MultiMySQL(object):
     def teardown_request(self, exception):
         '''Flask after request teardown for closing the connection'''
         ctx = _request_ctx_stack.top
-        if hasattr(ctx, 'mysql_cons'):
+        if hasattr(ctx, 'mysql_cons') and self.prefix in ctx.mysql_cons:
             ctx.mysql_cons[self.prefix].close()
 
